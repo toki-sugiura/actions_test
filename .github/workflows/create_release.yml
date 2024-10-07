@@ -1,0 +1,100 @@
+name: Create release tag and release note.
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  create-release-tag:
+    runs-on: ubuntu-latest
+
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TZ: 'Asia/Tokyo'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 前回のりリースタグを取得する
+      - name: Get previous tag
+        id: pre_tag
+        run: |
+          echo "current_version=$(curl https://api.github.com/repos/${{ github.repository }}/releases -s -H 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' -H 'Accept: application/vnd.github.v3+json'| jq -r '.[] | select(.target_commitish == "develop") | .tag_name' | head -1)" >> $GITHUB_OUTPUT
+          echo "labels=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[]?.name' | tr '\n' ',')" >> $GITHUB_OUTPUT
+
+      # タグを生成する 「vx.x.x」
+      - name: Generate release tag
+        id: release_tag
+        run: |
+          major=$(echo ${{ steps.pre_tag.outputs.current_version }} | sed -r "s/^.*([0-9]+)\.([0-9]+)\.([0-9]+)$/\1/")
+          minor=$(echo ${{ steps.pre_tag.outputs.current_version }} | sed -r "s/^.*([0-9]+)\.([0-9]+)\.([0-9]+)$/\2/")
+          patch=$(echo ${{ steps.pre_tag.outputs.current_version }} | sed -r "s/^.*([0-9]+)\.([0-9]+)\.([0-9]+)$/\3/")
+          if [ `echo "${{ steps.pre_tag.outputs.labels }}" | grep "Patch"` ]; then
+            patch=$(expr ${patch} + 1)
+          elif [ `echo "${{ steps.pre_tag.outputs.labels }}" | grep "Minor"` ]; then
+            minor=$(expr ${minor} + 1)
+            patch=0
+          elif [ `echo "${{ steps.pre_tag.outputs.labels }}" | grep "Major"` ]; then
+            major=$(expr ${major} + 1)
+            minor=0
+            patch=0
+          else
+            patch=$(expr ${patch} + 1)
+          fi
+          new_version="v${major}.${minor}.${patch}"
+          echo "release_tag=${new_version}" >> $GITHUB_OUTPUT
+
+      # labelを削除(Patch)
+      - name: Remve tag Patch
+        uses: actions/github-script@v6
+        if: contains(github.event.pull_request.labels.*.name, 'Patch')
+        with:
+          script: |
+            github.rest.issues.removeLabel({
+              issue_number: ${{ github.event.pull_request.number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: ["Patch"]
+            })
+
+      # labelを削除(Minor)
+      - name: Remve tag Minor
+        uses: actions/github-script@v6
+        if: contains(github.event.pull_request.labels.*.name, 'Minor')
+        with:
+          script: |
+            github.rest.issues.removeLabel({
+              issue_number: ${{ github.event.pull_request.number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: ["Minor"]
+            })
+
+      # labelを削除(Major)
+      - name: Remve tag Major
+        uses: actions/github-script@v6
+        if: contains(github.event.pull_request.labels.*.name, 'Major')
+        with:
+          script: |
+            github.rest.issues.removeLabel({
+              issue_number: ${{ github.event.pull_request.number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              name: ["Major"]
+            })
+
+      # 前回リリースからの差分をもとに、リリースノートの本文を生成する
+      - name: Generate release note
+        id: release_note
+        run: |
+          echo "release_note=$(curl -X POST -H 'Accept: application/vnd.github.v3+json' -H 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' https://api.github.com/repos/${{ github.repository }}/releases/generate-notes -d '{"tag_name":"${{ steps.release_tag.outputs.release_tag }}", "previous_tag_name":"${{ steps.pre_tag.outputs.pre_tag }}"}' | jq .body | sed 's/"//g')" >> $GITHUB_OUTPUT
+
+      # タグを切り、リリースノートを作成する
+      - name: Create Release
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -d "{ \"tag_name\": \"${{ steps.release_tag.outputs.release_tag }}\", \"name\": \"${{ steps.release_tag.outputs.release_tag }}\", \"body\": \"${{ steps.release_note.outputs.release_note }}\"}" \
+            https://api.github.com/repos/${{ github.repository }}/releases
+
