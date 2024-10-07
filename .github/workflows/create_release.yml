@@ -47,7 +47,7 @@ jobs:
           echo ${{ steps.pre_tag.outputs.current_version }}
           echo ${{ github.event.pull_request.labels.*.name}}
           echo ${{ steps.pre_tag.outputs.labels }}
-          echo ${{ new_version }}
+          echo ${ new_version }
           echo "================"
           echo "release_tag=${new_version}" >> $GITHUB_OUTPUT
 
