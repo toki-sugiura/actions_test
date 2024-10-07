@@ -43,6 +43,12 @@ jobs:
             patch=$(expr ${patch} + 1)
           fi
           new_version="v${major}.${minor}.${patch}"
+          echo "================"
+          echo ${{ steps.pre_tag.outputs.current_version }}
+          echo ${{ github.event.pull_request.labels.*.name}}
+          echo ${{ steps.pre_tag.outputs.labels }}
+          echo ${{ new_version }}
+          echo "================"
           echo "release_tag=${new_version}" >> $GITHUB_OUTPUT
 
       # labelを削除(Patch)
