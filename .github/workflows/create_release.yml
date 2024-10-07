@@ -20,7 +20,7 @@ jobs:
       - name: Get previous tag
         id: pre_tag
         run: |
-          log=$(curl https://api.github.com/repos/${{ github.repository }}/releases -s -H 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' -H 'Accept: application/vnd.github.v3+json'| jq -r '.[] | select(.target_commitish == "develop") | .tag_name' | head -1)
+          log=$(curl https://api.github.com/repos/${{ github.repository }}/releases -s -H 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' -H 'Accept: application/vnd.github.v3+json')
           echo "-------"
           echo $log
           echo "-------"
