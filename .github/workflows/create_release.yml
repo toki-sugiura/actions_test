@@ -20,7 +20,8 @@ jobs:
       - name: Get previous tag
         id: pre_tag
         run: |
-          echo "current_version=$(curl https://api.github.com/repos/${{ github.repository }}/releases -s -H 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' -H 'Accept: application/vnd.github.v3+json')" >> $GITHUB_OUTPUT
+          echo $(curl https://api.github.com/repos/${{ github.repository }}/releases -s -H 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' -H 'Accept: application/vnd.github.v3+json'| jq -r '.[] | select(.target_commitish == "develop") | .tag_name' | head -1)
+          echo "current_version=$(curl https://api.github.com/repos/${{ github.repository }}/releases -s -H 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' -H 'Accept: application/vnd.github.v3+json'| jq -r '.[] | select(.target_commitish == "develop") | .tag_name' | head -1)" >> $GITHUB_OUTPUT
           echo "labels=$(gh pr view ${{ github.event.pull_request.number }} --json labels --jq '.labels[]?.name' | tr '\n' ',')" >> $GITHUB_OUTPUT
 
       # タグを生成する 「vx.x.x」
